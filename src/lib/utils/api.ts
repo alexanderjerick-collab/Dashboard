@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db/prisma";
+import { createHash } from "crypto";
 
 export type ApiContext = {
   params?: Record<string, string>;
@@ -33,5 +35,44 @@ export function withAuth(handler: Handler) {
       ...ctx,
       session: session as unknown as ApiContext["session"],
     });
+  };
+}
+
+export async function validateApiKey(req: NextRequest): Promise<{
+  valid: boolean;
+  userId?: string;
+  permissions?: Record<string, boolean>;
+}> {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return { valid: false };
+
+  const rawKey = authHeader.slice(7);
+  const keyHash = createHash("sha256").update(rawKey).digest("hex");
+
+  const apiKey = await prisma.apiKey.findUnique({
+    where: { keyHash },
+    include: { user: { select: { id: true, permission: true } } },
+  });
+
+  if (!apiKey || !apiKey.isActive) return { valid: false };
+
+  await prisma.apiKey.update({
+    where: { id: apiKey.id },
+    data: { lastUsedAt: new Date() },
+  });
+
+  const perms = apiKey.user?.permission;
+  return {
+    valid: true,
+    userId: apiKey.user?.id,
+    permissions: perms
+      ? {
+          promote: perms.canPromote,
+          demote: perms.canDemote,
+          exile: perms.canExile,
+          acceptReqs: perms.canAcceptReqs,
+          rejectReqs: perms.canRejectReqs,
+        }
+      : undefined,
   };
 }
