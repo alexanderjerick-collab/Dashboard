@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const issuedById = session.user.id;
+  if (!issuedById) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
@@ -38,7 +41,7 @@ export async function POST(req: NextRequest) {
   const warning = await prisma.warning.create({
     data: {
       userId: parsed.data.userId,
-      issuedById: session.user.id,
+      issuedById,
       reason: parsed.data.reason,
     },
     include: {
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
   await prisma.auditLog.create({
     data: {
       action: "WARNING_ISSUED",
-      actorId: session.user.id,
+      actorId: issuedById,
       targetUserId: parsed.data.userId,
       details: { reason: parsed.data.reason },
     },
