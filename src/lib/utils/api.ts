@@ -51,28 +51,26 @@ export async function validateApiKey(req: NextRequest): Promise<{
 
   const apiKey = await prisma.apiKey.findUnique({
     where: { keyHash },
-    include: { user: { select: { id: true, permission: true } } },
+    select: {
+      id: true,
+      status: true,
+      permissions: true,
+      userId: true,
+    },
   });
 
-  if (!apiKey || !apiKey.isActive) return { valid: false };
+  if (!apiKey || apiKey.status !== "ACTIVE") return { valid: false };
 
   await prisma.apiKey.update({
     where: { id: apiKey.id },
     data: { lastUsedAt: new Date() },
   });
 
-  const perms = apiKey.user?.permission;
+  const perms = (apiKey.permissions ?? {}) as Record<string, boolean>;
+
   return {
     valid: true,
-    userId: apiKey.user?.id,
-    permissions: perms
-      ? {
-          promote: perms.canPromote,
-          demote: perms.canDemote,
-          exile: perms.canExile,
-          acceptReqs: perms.canAcceptReqs,
-          rejectReqs: perms.canRejectReqs,
-        }
-      : undefined,
+    userId: apiKey.userId,
+    permissions: perms,
   };
 }
