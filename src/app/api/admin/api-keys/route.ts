@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
   const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
   const keyPrefix = rawKey.slice(0, 8);
 
+  const userId = session.user.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const key = await prisma.apiKey.create({
     data: {
       name: parsed.data.name,
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
       expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
       rateLimit: parsed.data.rateLimit,
       ipRestrictions: parsed.data.ipRestrictions,
-      userId: session.user.id,
+      user: { connect: { id: userId } },
     },
   });
 
