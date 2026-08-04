@@ -24,7 +24,9 @@ interface Permission {
   canManageBilling: boolean;
 }
 
-const permLabels: Array<{ key: keyof Permission; label: string }> = [
+type BoolPermKey = keyof Omit<Permission, "id" | "name" | "description" | "level">;
+
+const permLabels: Array<{ key: BoolPermKey; label: string }> = [
   { key: "canPromote", label: "Promote Members" },
   { key: "canDemote", label: "Demote Members" },
   { key: "canExile", label: "Exile Members" },
@@ -72,7 +74,7 @@ function PermModal({
     perm ? { ...perm } : { ...defaultPerm }
   );
 
-  function toggle(key: keyof Omit<Permission, "id" | "name" | "description" | "level">) {
+  function toggle(key: BoolPermKey) {
     setForm((f) => ({ ...f, [key]: !f[key] }));
   }
 
@@ -103,8 +105,8 @@ function PermModal({
                 <label key={key} className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-purple-500/5 cursor-pointer transition-colors">
                   <input
                     type="checkbox"
-                    checked={form[key] as boolean}
-                    onChange={() => toggle(key as keyof Omit<Permission, "id" | "name" | "description" | "level">)}
+                    checked={form[key]}
+                    onChange={() => toggle(key)}
                     className="w-4 h-4 accent-purple-500"
                     style={{ width: "16px" }}
                   />
@@ -198,7 +200,7 @@ export default function RanksClient() {
       ) : (
         <div className="space-y-3">
           {permissions.map((perm) => {
-            const activePerms = permLabels.filter(({ key }) => perm[key] as boolean);
+            const activePerms = permLabels.filter(({ key }) => perm[key]);
             return (
               <div key={perm.id} className="glass rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-4">
