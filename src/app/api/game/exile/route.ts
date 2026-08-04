@@ -1,0 +1,42 @@
+import { NextRequest, NextResponse } from "next/server";
+import { validateApiKey } from "@/lib/utils/api";
+import { prisma } from "@/lib/db/prisma";
+import { robloxClient } from "@/lib/roblox/client";
+import { decrypt } from "@/lib/utils/encrypt";
+
+export async function POST(req: NextRequest) {
+  const { valid, userId, permissions } = await validateApiKey(req);
+  if (!valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!permissions?.exile) return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+
+  const { groupId, userId: targetUserId } = await req.json();
+  if (!groupId || !targetUserId) {
+    return NextResponse.json({ error: "groupId and userId are required" }, { status: 400 });
+  }
+
+  const group = await prisma.group.findUnique({ where: { robloxGroupId: groupId } });
+  if (!group) return NextResponse.json({ error: "Group not found" }, { status: 404 });
+
+  const user = await prisma.user.findUnique({ where: { id: userId! }, select: { robloxCookie: true } });
+  if (!user?.robloxCookie) return NextResponse.json({ error: "No Roblox cookie configured" }, { status: 400 });
+
+  try {
+    const cookie = decrypt(user.robloxCookie);
+    await robloxClient.exile(groupId, targetUserId, cookie);
+
+    await prisma.auditLog.create({
+      data: {
+        action: "EXILE",
+        actorId: userId,
+        groupId: group.id,
+        targetUserId,
+        details: { source: "api" },
+      },
+    });
+
+    return NextResponse.json({ success: true, message: "Member exiled" });
+  } catch (err) {
+    console.error("Exile error:", err);
+    return NextResponse.json({ error: "Failed to exile member" }, { status: 500 });
+  }
+}
