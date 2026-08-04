@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { createdAt: "desc" },
-      include: { permission: { select: { name: true, level: true } } },
       select: {
         id: true,
         username: true,
