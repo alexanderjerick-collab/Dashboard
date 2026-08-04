@@ -58,7 +58,7 @@ export async function PATCH(
       action: "PERMISSION_UPDATED",
       actorId: session.user.id,
       targetUserId: id,
-      details: data,
+      details: JSON.parse(JSON.stringify(data)),
     },
   });
 
